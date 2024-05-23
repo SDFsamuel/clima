@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    <title>Clima en Córdoba</title>
+</head>
+
+<body style="padding: 20px; font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;">
+
+    <div data-role="page" id="page">
+        <div data-role="header">
+            <h1>Localización y Clima</h1>
+            <h3>Departamento de Córdoba</h3>
+        </div>
+
+        <div data-role="content">
+            <div class="row">
+                <div class="col-md-6">
+                    <h3>Municipios</h3>
+                    <select id="municipios" class="form-select mb-3">
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <div id="map" style="height: 400px;"></div>
+                </div>
+            </div>
+
+            <h2 class="mt-4">Información del clima</h2>
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <td>Temperatura actual</td>
+                        <td id="temperaturaActual"></td>
+                    </tr>
+                    <tr>
+                        <td>Sensación térmica</td>
+                        <td id="sensacionTermica"></td>
+                    </tr>
+                    <tr>
+                        <td>Temperatura mínima y máxima</td>
+                        <td id="temperaturaMinMax"></td>
+                    </tr>
+                    <tr>
+                        <td>Presión atmosférica</td>
+                        <td id="presionAtmosferica"></td>
+                    </tr>
+                    <tr>
+                        <td>Humedad</td>
+                        <td id="humedad"></td>
+                    </tr>
+                    <tr>
+                        <td>Velocidad y dirección del viento</td>
+                        <td id="viento"></td>
+                    </tr>
+                    <tr>
+                        <td>Nubosidad</td>
+                        <td id="nubosidad"></td>
+                    </tr>
+                    <tr>
+                        <td>Precipitación</td>
+                        <td id="precipitacion"></td>
+                    </tr>
+                    <tr>
+                        <td>Hora de salida y puesta del sol</td>
+                        <td id="salidaPuestaSol"></td>
+                    </tr>
+                    <tr>
+                        <td>Pronósticos por hora para las próximas 48 horas</td>
+                        <td id="pronosticoPorHora"></td>
+                    </tr>
+                    <tr>
+                        <td>Pronósticos diarios para los próximos 7 días</td>
+                        <td id="pronosticoDiario"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let marker;
+
+        (() => {
+            const municipios = ["Montería", "Cereté", "Lorica", "Sahagún", "Montelíbano", "Planeta Rica", "Tierralta", "Puerto Escondido", "Buenavista", "Ayapel", "San Pelayo", "Puerto Libertador", "Ciénaga de Oro", "San Andrés de Sotavento", "Chimá", "Tuchín", "Valencia", "Cotorra", "Momil", "La Apartada", "Pueblo Nuevo", "San Antero", "Los Córdobas"];
+            const selectMunicipios = document.getElementById("municipios");
+
+            municipios.forEach(municipio => {
+                const option = document.createElement("option");
+                option.value = municipio;
+                option.textContent = municipio;
+                selectMunicipios.appendChild(option);
+            });
+
+            selectMunicipios.addEventListener("change", () => {
+                const municipioSeleccionado = selectMunicipios.value;
+                obtenerCoordenadasYClima(municipioSeleccionado);
+            });
+        })();
+
+        function obtenerCoordenadasYClima(municipio) {
+            const apiUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${municipio},Córdoba,Colombia`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        const latitude = data[0].lat;
+                        const longitude = data[0].lon;
+                        actualizarMapa(latitude, longitude);
+                        obtenerClima(latitude, longitude);
+                    } else {
+                        alert('No se encontraron coordenadas para el municipio seleccionado');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al obtener coordenadas:', error);
+                });
+        }
+
+        function actualizarMapa(latitude, longitude) {
+            if (map) {
+                map.setView([latitude, longitude], 10);
+                if (marker) {
+                    marker.setLatLng([latitude, longitude]);
+                } else {
+                    marker = L.marker([latitude, longitude]).addTo(map).bindPopup('Municipio seleccionado').openPopup();
+                }
+            } else {
+                map = L.map("map").setView([latitude, longitude], 10);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+                marker = L.marker([latitude, longitude]).addTo(map).bindPopup('Municipio seleccionado').openPopup();
+            }
+        }
+
+        function obtenerClima(latitude, longitude) {
+            const apiKey = 'cf32fd5735288b54a0c1c974845bd130';
+            const apiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric&lang=es`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    mostrarClima(data);
+                })
+                .catch(error => {
+                    console.error('Error al obtener el clima:', error);
+                });
+        }
+
+        function mostrarClima(data) {
+            document.getElementById('temperaturaActual').textContent = `${data.main.temp}°C`;
+            document.getElementById('sensacionTermica').textContent = `${data.main.feels_like}°C`;
+            document.getElementById('temperaturaMinMax').textContent = `${data.main.temp_min}°C - ${data.main.temp_max}°C`;
+            document.getElementById('presionAtmosferica').textContent = `${data.main.pressure} hPa`;
+            document.getElementById('humedad').textContent = `${data.main.humidity}%`;
+            document.getElementById('viento').textContent = `${data.wind.speed} m/s, ${data.wind.deg}°`;
+            document.getElementById('nubosidad').textContent = `${data.clouds.all}%`;
+            document.getElementById('precipitacion').textContent = `${data.rain ? data.rain['1h'] : 'N/A'} mm`;
+            document.getElementById('salidaPuestaSol').textContent = `${new Date(data.sys.sunrise * 1000).toLocaleTimeString()} - ${new Date(data.sys.sunset * 1000).toLocaleTimeString()}`;
+            
+            // Obtener pronósticos por hora
+            obtenerPronosticoPorHora(data.coord.lat, data.coord.lon);
+            
+            // Obtener pronósticos diarios
+            obtenerPronosticoDiario(data.coord.lat, data.coord.lon);
+        }
+
+        function obtenerPronosticoPorHora(lat, lon) {
+            const apiKey = 'cf32fd5735288b54a0c1c974845bd130';
+            const apiUrl = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es&exclude=current,minutely,daily,alerts`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const hourlyForecast = data.hourly.slice(0, 48).map(hour => `${new Date(hour.dt * 1000).toLocaleTimeString()}: ${hour.temp}°C`).join(', ');
+                    document.getElementById('pronosticoPorHora').textContent = hourlyForecast;
+                })
+                .catch(error => {
+                    console.error('Error al obtener el pronóstico por hora:', error);
+                });
+        }
+
+        function obtenerPronosticoDiario(lat, lon) {
+            const apiKey = 'cf32fd5735288b54a0c1c974845bd130';
+            const apiUrl = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es&exclude=current,minutely,hourly,alerts`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const dailyForecast = data.daily.slice(1, 8).map(day => `${new Date(day.dt * 1000).toLocaleDateString()}: ${day.temp.min}°C - ${day.temp.max}°C`).join(', ');
+                    document.getElementById('pronosticoDiario').textContent = dailyForecast;
+                })
+                .catch(error => {
+                    console.error('Error al obtener el pronóstico diario:', error);
+                });
+        }
+    </script>
+
+</body>
+
+</html>
+
